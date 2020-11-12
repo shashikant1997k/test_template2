@@ -1,0 +1,50 @@
+th[name="buttons"] {
+  display: none;
+}
+
+td[name="buttons"] {
+  text-align: center;
+}
+
+td[name="buttons"] .btn-group {
+  float: none !important;
+  display: flex;
+  flex-direction: row;
+}
+
+.input-text-center input {
+  text-align: center;
+}
+
+.sheets_upload {
+  padding: 50px;
+}
+
+._button {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  padding-left: 12px;
+  margin-bottom: 20px;
+}
+.table_main {
+  width: 100%;
+  overflow-x: auto;
+  display: none;
+}
+
+#masterSheetTable {
+  width: 1100px;
+  margin: auto;
+  max-width: unset;
+}
+
+@media only screen and (max-width: 600px) {
+  .table_main {
+    margin-left: 2.5%;
+    width: 95%;
+  }
+  #masterSheetTable {
+    width: min-content;
+  }
+}
