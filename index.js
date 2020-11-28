@@ -1,110 +1,25 @@
 $(document).ready(function () {
   var mobileVar = 0;
-  var val1 = 2;
-  var val2 = 3;
   var screenWidth = window.matchMedia("(max-width: 600px)");
   if (screenWidth.matches) {
     mobileVar = 1;
   }
-
   var resultArray = {
     headers: [],
     file_data: [],
   };
+  var formData = new FormData();
+  var _csvData;
 
-  function createTable(resultArray) {
-    var headLen = resultArray.headers.length;
-    $(".table_main").show();
-    if (resultArray.file_data.length == 0) {
-      $(".table_body").html(
-        "<tr><td class='text-center' colspan='11' style='padding:10px;font-size:16px;'>No Data</td></tr>"
-      );
-      return false;
-    }
-    if (Array.isArray(resultArray.headers) && resultArray.headers.length != 0) {
-      var th_data = "";
-      resultArray.headers.forEach((val, i) => {
-        th_data += `<th class="text-center ${
-          i > 2 && i < 10 ? "head_hide_class" : ""
-        }">${val}</th>`;
-        if (i == 2) {
-          th_data += `<th style="display: none;" class="text-center view_more">...</th>`;
-        }
-      });
-      th_data +=
-        "<th class='text-center' style='white-space:nowrap' data-id='edit_row'>Edit</th>";
-      $(".table_head_row").html(th_data);
-    }
-
-    if (
-      Array.isArray(resultArray.file_data) &&
-      resultArray.file_data.length != 0
-    ) {
-      var tr_data = "";
-      resultArray.file_data.forEach((item, index) => {
-        if (item.length == headLen) {
-          var td_data = "";
-          item.forEach((val, i) => {
-            td_data += `<td class="text-center input-text-center ${
-              i > 2 && i < 10 ? "hide_class" : ""
-            }">${val}</td>`;
-
-            if (i == 2) {
-              td_data += `<td style="display: none;" class="text-center input-text-center view_more">...</td>`;
-            }
-          });
-          tr_data += `<tr class="row_${index + 1}">${td_data}</tr>`;
-        }
-      });
-      $(".table_body").html(tr_data);
-    }
-
-    $("#masterSheetTable").SetEditable({
-      $addButton: $("#addNewRow"),
-      onDelete: function () {
-        console.log("delete");
-      },
-
-      onEdit: function () {
-        console.log("Edit");
-      },
-
-      onAdd: function () {
-        console.log("Add");
-      },
-    });
-  }
-
-  $("#searchInput").keyup(function () {
-    let input = $(this).val();
-    let { headers, file_data } = resultArray;
-    let result = {
-      headers,
-      file_data,
-    };
-    let val = input.toLowerCase();
-    result.file_data = val
-      ? result?.file_data.filter((v) => {
-          return (
-            v[0]?.toLowerCase()?.includes(val) ||
-            v[1]?.toLowerCase()?.includes(val) ||
-            v[2]?.toLowerCase()?.includes(val)
-          );
-        })
-      : result?.file_data;
-
-    createTable(result);
-  });
-
-  $(".upload_master_sheet").change(function () {
-    var imgData = $(".upload_master_sheet")[0].files[0];
-
+  $("#csvFile").change(function () {
+    var imgData = $("#csvFile")[0].files[0];
+    formData.append("file", imgData);
     if (imgData != undefined) {
       var fileType = ["csv", "xsls", "xls", "xlsx"];
-      var file_typ = imgData.name.substring(imgData.name.indexOf(".") + 1);
+      var file_typ = imgData.name.substring(imgData.name.lastIndexOf(".") + 1);
 
       if (fileType.indexOf(file_typ) < 0) {
-        $(".upload_master_sheet").val("");
+        $("#csvFile").val("");
         alert("file not supported");
         return false;
       }
@@ -115,114 +30,282 @@ $(document).ready(function () {
         var fileData = reader.result;
         var wb = XLSX.read(fileData, { type: "binary" });
         wb.SheetNames.forEach(function (sheetName) {
-          var csvData = XLSX.utils.sheet_to_csv(wb.Sheets[sheetName]);
-          console.log(csvData);
-          var temp = csvData.split("\n");
-          temp.splice(0, 2);
-          var csvData = temp.join("\n");
+          let csv_data = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {
+            header: 1,
+          });
 
-          var headers = csvData
-            .split("\n")[0]
-            .replace(/\s/g, " ")
-            .trim()
-            .split(",");
-
-          headers = headers.filter((v) => v != "");
-          var csv_data = csvData.split("\n");
-          if (csv_data[0] != "" && csv_data[1] != "") {
-            var csvLen = csv_data.length;
-            var file_data = [];
-            for (var i = 0; i < csvLen; i++) {
-              file_data[i] = String(csv_data[i + 1])
-                .replace(/\s/g, " ")
-                .trim()
-                .split(",");
-              file_data[i] = file_data[i].filter((v) => v != "");
-            }
-            resultArray.headers = headers;
-            resultArray.file_data = file_data;
-          }
+          _csvData = csv_data.length ? csv_data : _csvData;
         });
-
-        createTable(resultArray);
+        createDummyTable(_csvData);
       };
 
       reader.readAsBinaryString(imgData);
-
-      setTimeout(() => {
-        if (mobileVar == 1) {
-          $(".hide_class,.head_hide_class").hide();
-          $(".view_more").show();
-        }
-      }, 10);
     }
   });
 
-  if (mobileVar == 1) {
-    function resetTable(row) {
-      var getRowClass = row.attr("class");
-      $(`.${getRowClass} .hide_class`).hide();
-      $(`.${getRowClass}`).css({
-        "box-shadow": "unset",
-      });
-      var trOpen = 0;
-      $(".table_body tr").each((i, v) => {
-        var getID = $(v).attr("id");
-        if (getID && getID == "editing") {
-          trOpen = 1;
+  function createDummyTable(res) {
+    var tData = "";
+    var thData = "";
+    var optionRow = "";
+    if (Array.isArray(res) && res.length) {
+      for (var i = 0; i < (res.length >= 8 ? 8 : res.length); i++) {
+        tData += `<tr class="option_row" data-id="${i}"><td>${i}</td>`;
+        for (var j = 0; j <= res[i].length; j++) {
+          tData += `<td class="_data_td${j}">${
+            res[i][j] != undefined
+              ? res[i][j].length < 20
+                ? res[i][j]
+                : res[i][j].slice(0, 20) + "..."
+              : ""
+          }</td>`;
         }
-      });
 
-      if (trOpen) {
-        $("#masterSheetTable").css("width", "1100px");
-      } else {
-        $("#masterSheetTable").css("width", "min-content");
-        $(".head_hide_class").hide();
-        $(`.view_more`).show();
+        tData += `</tr>`;
       }
     }
-
-    $(document).on("click", "#bEdit", function () {
-      var getRow = $(this).parents().eq(2);
-      var getRowClass = getRow.attr("class");
-      $("#masterSheetTable").css("width", "1100px");
-      $(`.${getRowClass} .hide_class`).show();
-      $(`.${getRowClass}`).css({
-        "box-shadow":
-          "0 1px 10px rgba(0, 0, 0, 0.2), 0 1px 10px rgba(0, 0, 0, 0.26)",
-      });
-      $(".head_hide_class").show();
-      $(".view_more").hide();
-    });
-
-    $(document).on("click", "#bAcep", function () {
-      var getRow = $(this).parents().eq(2);
-      resetTable(getRow);
-    });
-
-    $(document).on("click", "#bCanc", function () {
-      var getRow = $(this).parents().eq(2);
-      resetTable(getRow);
-    });
+    $("#upload_file").modal("show");
+    $(".modal-title").html("Select Column Header Row");
+    $(".csv_files").hide();
+    $(".csv_dummy_files,.next_btn").show();
+    $(".custom_modal .modal-body .csv_dummy_files table tbody").html(
+      `${tData}`
+    );
   }
 
-  $("#download").click(function () {
-    var tble = document.getElementById("masterSheetTable");
-    var row = tble.rows;
+  var rowNum = null;
+  $(document).on("click", ".option_row", function () {
+    rowNum = $(this).data("id");
+    $(".error_msg").hide();
+    $(".option_row").css({
+      background: "#FFF",
+      color: "#000",
+      "box-shadow": "none",
+    });
+    $(this).css({
+      background: "#35A630",
+      color: "#FFF",
+      "box-shadow": "0px 0px 5px -1px #35A630",
+    });
+  });
 
-    for (let i = 0; i < row[0].cells.length; i++) {
-      var str = row[0].cells[i];
-      var id = $(str).data("id");
-      if (id == "edit_row") {
-        for (var j = 0; j < row.length; j++) {
-          row[j].deleteCell(i);
+  $(document).on("click", ".back_btn", function () {
+    $("#upload_file").modal("show");
+    $(".modal-title").html("Select Header Row");
+    $(".csv_files,.back_btn, .submit_btn").hide();
+    $(".csv_dummy_files,.next_btn").show();
+  });
+
+  $(document).on("click", ".next_btn", function () {
+    if (!rowNum) {
+      $(".error_msg").show();
+      return false;
+    }
+    if (_csvData.length > 0) {
+      var csv1 = [..._csvData[0], ..._csvData[1]];
+      csv1 = csv1.filter((v) => v);
+      console.log(rowNum);
+      var csv2 = [];
+      csv1.forEach((v) => {
+        csv2.push(v.trim().replace(":", ""));
+      });
+
+      var topData = {};
+      for (let i = 0; i < csv2.length; i = i + 2) {
+        topData[csv2[i]] = csv2[i + 1];
+      }
+
+      var headers =
+        _csvData[rowNum].length > 0 && _csvData[rowNum].filter((v) => v);
+      var temp = _csvData.slice(rowNum + 1, _csvData.length);
+      var temp1 = temp[0].filter((v) => v);
+      var _len = temp1.length;
+      var file_data = [];
+
+      if (Array.isArray(temp) && temp.length > 0) {
+        temp.forEach((arr) => {
+          if (Array.isArray(arr) && arr.length > 0) {
+            var temp2 = arr.filter((v) => v);
+            if (temp2.length == _len) {
+              file_data.push(temp2);
+            }
+          }
+        });
+      }
+
+      resultArray.headers = headers;
+      resultArray.file_data = file_data;
+
+      console.log(file_data.length);
+    }
+
+    createTable(resultArray);
+  });
+
+  // create table from uploaded file data
+  function createTable(output) {
+    $("#upload_file").modal("show");
+    $(".modal-title").html("Row mapping");
+    $(".csv_files,.back_btn, .submit_btn").show();
+    $(".csv_dummy_files,.next_btn").hide();
+    var headers = output.headers || [];
+    var file_data = output.file_data || [];
+    var tData = "";
+    var thData = "";
+    var optionRow = "";
+    var mobileOptionRow = "";
+
+    var map_array = {
+      Category: "category",
+      "Item Code": "item_code",
+      "Item Name": "item_name",
+      "RFA Qty": "rfa_qty",
+      "Total Value": "total_value",
+      "Salv Qty": "salv_qty",
+      UOM: "uom",
+      "Salv Value": "salv_value",
+      "RFA Value": "rfa_value",
+    };
+
+    // headers[j].toLowerCase().replace(/[^a-zA-Z0-9]+(.)/g, (m, chr) => chr.toUpperCase())
+
+    if (Array.isArray(headers) && headers.length) {
+      for (var j = 0; j < headers.length; j++) {
+        if (headers[j]) {
+          if (mobileVar) {
+            let mobileSelect = "";
+            for (var key in map_array) {
+              let con1 = headers[j].toLowerCase().split(" ").join("_");
+              mobileSelect += `<option ${
+                con1 == map_array[key] ? "selected" : ""
+              } value=${map_array[key]} align='center'>${key}</option>`;
+            }
+            mobileOptionRow = `<div class="_mobile_select_td">
+              <div class="_select">
+                <select class="form-control mappingVal" id="_select_${j}">
+                  <option value="">Select</option>
+                  ${mobileSelect}
+                </select>
+              </div></div>`;
+
+            thData += `<td class='mappedVal' id="_skip_td${j}">
+              <div class="mob_head_style">
+                <div style="width:60%;display:flex;flex-direction:column;justify-content:space-arround;">
+                  <div style="font-weight:600;color:#656565">
+                    ${
+                      headers[j].length < 20
+                        ? headers[j]
+                        : headers[j].slice(0, 20) + "..."
+                    }
+                  </div>
+                  <div style="font-weight:500;color:#656565">
+                    ${
+                      file_data[0][j].length < 20
+                        ? file_data[0][j]
+                        : file_data[0][j].slice(0, 20) + "..."
+                    }
+                  </div>
+                </div>
+                <div styly="width:40%;font-wieght:normal;color:#656565;">
+                  ${mobileOptionRow}
+                </div>
+              </div>
+            
+               </td> `;
+          } else {
+            optionRow += `<td class="_data_td${j}"><div class="_select_td">
+              <div class="_select">
+                <select class="form-control mappingVal" id="_select_${j}">
+                  <option value="">Select</option>`;
+
+            for (var key in map_array) {
+              let con1 = headers[j].toLowerCase().split(" ").join("_");
+              optionRow += `<option ${
+                con1 == map_array[key] ? "selected" : ""
+              } value=${map_array[key]} align='center'>${key}</option>`;
+            }
+
+            optionRow += `</select></div></div></td>`;
+
+            thData += `<th align='center' id="_skip_td${j}" data-value="${
+              headers[j]
+            }" class="mappedVal">${
+              headers[j].length < 20
+                ? headers[j]
+                : headers[j].slice(0, 20) + "..."
+            }
+            </th> `;
+          }
         }
       }
     }
 
-    let table = document.querySelector("#masterSheetTable");
-    TableToExcel.convert(table, {
-      name: "masterSheet.xlsx",
+    if (Array.isArray(file_data) && file_data.length) {
+      for (var i = 0; i < (file_data.length > 4 ? 4 : file_data.length); i++) {
+        tData += `<tr>`;
+        for (var j = 0; j < headers.length; j++) {
+          tData += `<td data-label="${
+            resultArray.headers[i]
+          }" class="_data_td${j}">${
+            file_data[i][j] != undefined
+              ? file_data[i][j].length < 20
+                ? file_data[i][j]
+                : file_data[i][j].slice(0, 20) + "..."
+              : ""
+          }</td>`;
+        }
+
+        tData += `</tr>`;
+      }
+    }
+
+    $(".custom_modal .modal-body .csv_files table thead #thead").html(
+      `${thData}`
+    );
+    $(".custom_modal .modal-body .csv_files table tbody").html(
+      `<tr>${optionRow}</tr>${tData}`
+    );
+  }
+
+  // Submit after mapping the data value
+  $(".submit_btn").click(function () {
+    var result = {};
+
+    var error_val = 0;
+    var input1 = $(".mappedVal");
+    var input2 = $(".mappingVal");
+    var mappedVal = [];
+    var mappingVal = [];
+
+    for (let i = 0; i < input2.length; i++) {
+      let v1 = $(input2[i]).find(":selected").val();
+      let v2 = $(input1[i]).data("value");
+      if (v1 != "") {
+        mappingVal.push(v1);
+      } else {
+        mappingVal.push(v2);
+      }
+    }
+    for (let i = 0; i < input1.length; i++) {
+      mappedVal.push($(input1[i]).data("value"));
+    }
+    mappedVal.forEach((key, i) => {
+      if (mappingVal[i] != 1) {
+        result[key] = mappingVal[i];
+      }
     });
+
+    let footer_start_row = resultArray.file_data.length + rowNum + 2;
+    formData.append("footer_start_row", footer_start_row);
+    formData.append("row_mapping", JSON.stringify(result));
+
+    for (let [name, value] of formData) {
+      console.log(value);
+    }
+  });
+
+  $("#upload_file").on("hidden.bs.modal", function () {
+    $(".modal-title").html("Select Column Header Row");
+    $(".csv_files,.csv_dummy_files,.back_btn, .submit_btn,.next_btn").hide();
+    $("#csvFile").val("");
   });
 });
