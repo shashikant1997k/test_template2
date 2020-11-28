@@ -90,7 +90,7 @@ $(document).ready(function () {
 
   $(document).on("click", ".back_btn", function () {
     $("#upload_file").modal("show");
-    $(".modal-title").html("Select Header Row");
+    $(".modal-title").html("Select Column Header Row");
     $(".csv_files,.back_btn, .submit_btn").hide();
     $(".csv_dummy_files,.next_btn").show();
   });
